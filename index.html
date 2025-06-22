@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create Category</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    .form-error { color: red; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+<div class="container mt-4">
+  <div class="card">
+    <div class="card-header bg-success text-white">
+      <h3 class="mx-4">Create Category</h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-12 mb-3">
+          <label for="categoryname" class="form-label">Category Name:</label>
+          <input type="text" class="form-control" id="categoryname" placeholder="Enter category name">
+          <div id="nameError" class="form-error"></div>
+        </div>
+        <div class="col-md-12 mb-3">
+          <label for="categorydescription" class="form-label">Category Description:</label>
+          <textarea class="form-control" id="categorydescription" placeholder="Description"></textarea>
+          <div id="descError" class="form-error"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <button onclick="addCategory()" class="btn btn-primary rounded-pill">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="container-fluid mt-4">
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped text-center" id="categoryTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Category Name</th>
+          <th>Description</th>
+          <th>Active</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- View Modal -->
+<div class="modal fade" id="viewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">View Category</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Name:</strong> <span id="viewName"></span></p>
+        <p><strong>Description:</strong> <span id="viewDescription"></span></p>
+        <p><strong>Active:</strong> <span id="viewActive"></span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title">Edit Category</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editRowIndex">
+        <div class="mb-3">
+          <label class="form-label">Category Name:</label>
+          <input type="text" class="form-control" id="editName">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description:</label>
+          <textarea class="form-control" id="editDescription"></textarea>
+        </div>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="editActive">
+          <label class="form-check-label">Active</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Confirm Delete</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete this category?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let categoryId = 1;
+  let categories = [];
+  let deleteIndex = null;
+
+  function validateForm(name, desc) {
+    let valid = true;
+    document.getElementById("nameError").textContent = "";
+    document.getElementById("descError").textContent = "";
+    if (!name) {
+      document.getElementById("nameError").textContent = "Category name is required!";
+      valid = false;
+    }
+    if (!desc) {
+      document.getElementById("descError").textContent = "Description is required!";
+      valid = false;
+    }
+    return valid;
+  }
+
+  function addCategory() {
+    const name = document.getElementById('categoryname').value.trim();
+    const description = document.getElementById('categorydescription').value.trim();
+    if (!validateForm(name, description)) return;
+
+    const category = {
+      id: categoryId++,
+      name,
+      description,
+      active: true
+    };
+    categories.push(category);
+    saveToLocalStorage();
+    renderTable();
+    document.getElementById('categoryname').value = "";
+    document.getElementById('categorydescription').value = "";
+  }
+
+  function renderTable() {
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = "";
+    categories.forEach((cat, index) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${cat.id}</td>
+        <td>${cat.name}</td>
+        <td>${cat.description}</td>
+        <td>
+          <div class="form-check form-switch d-inline-block">
+            <input class="form-check-input" type="checkbox" ${cat.active ? 'checked' : ''} onchange="toggleActive(${index})">
+          </div>
+        </td>
+        <td>
+          <button class="btn btn-info btn-sm me-1" onclick="viewRow(${index})">View</button>
+          <button class="btn btn-warning btn-sm me-1" onclick="editRow(${index})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRow(${index})">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }
+
+  function toggleActive(index) {
+    categories[index].active = !categories[index].active;
+    saveToLocalStorage();
+  }
+
+  function viewRow(index) {
+    const cat = categories[index];
+    document.getElementById("viewName").textContent = cat.name;
+    document.getElementById("viewDescription").textContent = cat.description;
+    document.getElementById("viewActive").textContent = cat.active ? "Yes" : "No";
+    new bootstrap.Modal(document.getElementById('viewModal')).show();
+  }
+
+  function editRow(index) {
+    const cat = categories[index];
+    document.getElementById("editRowIndex").value = index;
+    document.getElementById("editName").value = cat.name;
+    document.getElementById("editDescription").value = cat.description;
+    document.getElementById("editActive").checked = cat.active;
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+  }
+
+  function saveEdit() {
+    const index = document.getElementById("editRowIndex").value;
+    const name = document.getElementById("editName").value.trim();
+    const desc = document.getElementById("editDescription").value.trim();
+
+    if (!name) {
+      alert("Category name is required!");
+      return;
+    }
+    if (!desc) {
+      alert("Description is required!");
+      return;
+    }
+
+    categories[index].name = name;
+    categories[index].description = desc;
+    categories[index].active = document.getElementById("editActive").checked;
+    saveToLocalStorage();
+    renderTable();
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+  }
+
+  function deleteRow(index) {
+    deleteIndex = index;
+    new bootstrap.Modal(document.getElementById('confirmDeleteModal')).show();
+  }
+
+  document.getElementById("confirmDeleteBtn").addEventListener("click", function () {
+    if (deleteIndex !== null) {
+      categories.splice(deleteIndex, 1);
+      saveToLocalStorage();
+      renderTable();
+      deleteIndex = null;
+      bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal')).hide();
+    }
+  });
+
+  function saveToLocalStorage() {
+    localStorage.setItem("categories", JSON.stringify(categories));
+  }
+
+  function loadFromLocalStorage() {
+    const data = localStorage.getItem("categories");
+    if (data) {
+      categories = JSON.parse(data);
+      categoryId = categories.length > 0 ? Math.max(...categories.map(c => c.id)) + 1 : 1;
+      renderTable();
+    }
+  }
+
+  window.onload = loadFromLocalStorage;
+</script>
+</body>
+</html>
